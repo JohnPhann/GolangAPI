@@ -3,9 +3,13 @@ package main
 import (
 	"crypto/rand"
 	"database/sql"
+	"encoding/base64"
 	"encoding/hex"
+	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/dgrijalva/jwt-go"
@@ -29,6 +33,7 @@ type Claims struct {
 type Todo struct {
 	ID    int    `json:"id"`
 	Title string `json:"title"`
+	Name  string `json:"name"`
 }
 
 type ResponseData struct {
@@ -182,7 +187,9 @@ func refreshToken(c echo.Context) error {
 		Email        string `json:"email" form:"email"`
 		RefreshToken string `json:"refreshToken" form:"refreshToken"`
 	}
-
+	if err := c.Bind(&request); err != nil {
+		return c.String(http.StatusBadRequest, "Invalid request")
+	}
 	//init db
 	db, error := initDB()
 	if error != nil {
@@ -223,6 +230,20 @@ func refreshToken(c echo.Context) error {
 	return c.JSON(http.StatusOK, responseDataRefreshToken)
 }
 
+// POST : /v1/admins/todos
+func GetTodos(c echo.Context) error {
+	//init db
+	db, error := initDB()
+	if error != nil {
+		return nil
+	}
+	todos, err := GetAllTodos(db)
+	if err != nil {
+		return err
+	}
+	return c.JSON(http.StatusOK, todos)
+}
+
 func emailExists(email string, db *sql.DB) (bool, error) {
 
 	err := db.QueryRow("SELECT email FROM users WHERE email = ?", email).Scan(&email)
@@ -253,9 +274,75 @@ func AuthenticationUser(email string, password string, db *sql.DB) (bool, error)
 	return true, nil
 }
 
+func GetAllTodos(db *sql.DB) ([]Todo, error) {
+
+	rows, err := db.Query("SELECT id, title, name FROM todo")
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var todos []Todo
+	for rows.Next() {
+		var todo Todo
+		if err := rows.Scan(&todo.ID, &todo.Title, &todo.Name); err != nil {
+			return nil, err
+		}
+		todos = append(todos, todo)
+	}
+
+	return todos, nil
+}
+
 func apiKeyExists(apiKey string, email string, db *sql.DB) (bool, error) {
 
 	err := db.QueryRow("SELECT apiKey FROM users WHERE apiKey = ? AND email= ?", apiKey, email).Scan(&apiKey)
+	if err == sql.ErrNoRows {
+		// api not found in the database
+		return false, nil
+	} else if err != nil {
+		// Some other error occurred
+		return false, err
+	}
+
+	// api found in the database
+	return true, nil
+}
+
+func DecodeJWT(tokenString string, secretKey string) bool {
+	// Split the token into parts
+	parts := strings.Split(tokenString, ".")
+	if len(parts) != 3 {
+		fmt.Print("Token is Valid not format")
+		return false
+	}
+
+	// Decode and parse the payload (second part)
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		fmt.Print("payload error")
+		return false
+	}
+
+	// Unmarshal the payload into custom claims
+	var claims CustomClaims
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		fmt.Print("decode error")
+		return false
+	}
+	result, err := userIdExists(int(claims.UserID))
+	if err != nil {
+		return false
+	}
+	return result
+}
+
+func userIdExists(id int) (bool, error) {
+	db, error := initDB()
+	if error != nil {
+		return false, nil
+	}
+	err := db.QueryRow("SELECT id FROM users WHERE id = ? ", id).Scan(&id)
 	if err == sql.ErrNoRows {
 		// api not found in the database
 		return false, nil

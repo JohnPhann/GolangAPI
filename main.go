@@ -39,12 +39,13 @@ func main() {
 	// initDB
 	initDB()
 	// Create a new Echo instance
-
 	e := echo.New()
 	// Define a route
+
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Hello, Echo!")
 	})
+	e.POST("/admin", GetApiKey)
 
 	// Start the server
 	e.Start(":8080")

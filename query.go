@@ -12,8 +12,8 @@ func CreateTables(db *sql.DB) error {
         id INT AUTO_INCREMENT PRIMARY KEY,
         email VARCHAR(50),
 		password VARCHAR(50),
-		refreshToken VARCHAR(50),
-		apiKey	VARCHAR(50)
+		refreshToken VARCHAR(255),
+		apiKey	VARCHAR(255)
     )`
 
 	query2 := `

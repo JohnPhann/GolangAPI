@@ -45,8 +45,10 @@ func main() {
 	e.GET("/", func(c echo.Context) error {
 		return c.String(http.StatusOK, "Hello, Echo!")
 	})
-	e.POST("/admin", GetApiKey)
-
+	e.POST("/getApikey", GetApiKey)
+	e.POST("/v1/admin", CreateAdmin)
+	e.POST("/v1/admin/sign-in", SignInAdmin)
+	e.POST("/v1/admin/refreshToken", refreshToken)
 	// Start the server
 	e.Start(":8080")
 }
